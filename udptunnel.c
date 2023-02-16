@@ -217,7 +217,7 @@ static void parse_args(int argc, char *argv[], struct relay **relays,
     (*relays)[i].udpaddr.sin_port = htons(udpport + i);
     (*relays)[i].udpaddr.sin_family = AF_INET;
     (*relays)[i].udp_ttl = udpttl;
-    (*relays)[i].multicast_udp = IN_MULTICAST(htons(udpaddr.s_addr));
+    (*relays)[i].multicast_udp = IN_MULTICAST(ntohl(udpaddr.s_addr));
 
     (*relays)[i].tcpaddr.sin_addr = tcpaddr;
     (*relays)[i].tcpaddr.sin_port = htons(tcpport + i);
@@ -311,10 +311,11 @@ static void setup_udp_send(struct relay *relay)
     exit(1);
   }
 
-  if (IN_MULTICAST(htonl(relay->udpaddr.sin_addr.s_addr))) {
+  if (IN_MULTICAST(ntohl(relay->udpaddr.sin_addr.s_addr))) {
 #ifdef IP_MULTICAST_LOOP
     u_int8 loop = 0;
 
+    fprintf(stderr, "UDP multicast loop=%d\n", loop);
     if (setsockopt(relay->udp_send_sock, IPPROTO_IP, IP_MULTICAST_LOOP,
                    (void *)&loop, sizeof(loop)) < 0) {
       perror("setup_udp_send: setsockopt(IP_MULTICAST_LOOP)");
@@ -323,6 +324,7 @@ static void setup_udp_send(struct relay *relay)
 #endif
 
 #ifdef IP_MULTICAST_TTL
+    fprintf(stderr, "UDP multicast TTL=%d\n", relay->udp_ttl);
     if (setsockopt(relay->udp_send_sock, IPPROTO_IP, IP_MULTICAST_TTL,
                    (void *)&(relay->udp_ttl), sizeof(relay->udp_ttl)) < 0) {
       perror("setup_udp_send: setsockopt(IP_MULTICAST_TTL)");
@@ -423,7 +425,7 @@ static void await_incoming_connections(struct relay *relays, int relay_count)
     for (i = 0; i < relay_count; i++) {
       if (FD_ISSET(relays[i].tcp_listen_sock, &readfds)) {
         struct sockaddr_in client_addr;
-        int addrlen = sizeof(client_addr);
+        socklen_t addrlen = sizeof(client_addr);
         
         if ((relays[i].tcp_sock =
              accept(relays[i].tcp_listen_sock,
@@ -478,7 +480,7 @@ static int udp_to_tcp(struct relay *relay)
   struct out_packet p;
   int buflen;
   struct sockaddr_in remote_udpaddr;
-  int addrlen = sizeof(remote_udpaddr);
+  socklen_t addrlen = sizeof(remote_udpaddr);
 
   if ((buflen = recvfrom(relay->udp_recv_sock, p.buf, UDPBUFFERSIZE, 0,
                          (struct sockaddr *) &remote_udpaddr,
@@ -555,7 +557,8 @@ static int tcp_to_udp(struct relay *relay)
       /* There isn't a UDP listener waiting on the other end, but
        * that's okay, it's probably just not up at the moment or something.
        * Use getsockopt(SO_ERROR) to clear the error state. */
-      int err, len = sizeof(err);
+      int err;
+      socklen_t len = sizeof(err);
 
       if (debug > 1) {
         fprintf(stderr, "ECONNREFUSED on udp_send_sock; clearing.\n");
