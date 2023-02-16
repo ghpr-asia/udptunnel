@@ -20,7 +20,7 @@
 <h2>Synopsis</h2>
 <blockquote>
 <p><samp>udptunnel -s TCP-port [-r] [-v] UDP-addr/UDP-port[/ttl]</samp><br />
-<samp>udptunnel -c TCP-addr[/TCP-port] [-r] [-v] UDP-addr/UDP-port[/ttl]</samp>
+<samp>udptunnel -c TCP-addr[/TCP-port] [-r] [-v] [-t 20] UDP-addr/UDP-port[/ttl]</samp>
 </p>
 </blockquote>
 
@@ -33,10 +33,7 @@ allows only outgoing TCP connections.</p>
 
 <h2>Installation</h2>
 
-<p>Source code for Unix is available from: <a
-href="ftp://ftp.cs.columbia.edu/pub/lennox/udptunnel/">ftp://ftp.cs.columbia.edu/pub/lennox/udptunnel/</a>.</p>
-
-<p>To build, unpack the tar file, then type:</p>
+<p>To build, type:</p>
 <blockquote>
 <p><samp>./configure</samp><br />
 <samp>make</samp><br />
@@ -78,6 +75,12 @@ will open a TCP connection to the specified TCP host and port, and then
 relay UDP on it.
 <p>The TCP port may be omitted in this case; it will default to the same
 port number as the UDP port.</p></dd>
+<dt><samp>-t</samp> <i>num</i></dt>
+<dd><b>Number of connection attempts</b><br />
+<p>This client only flag causes client to try to connect to server the provided
+number of times before failing. Useful for service based models, when
+client has to wait for a server to start.</p>
+<p>If this flag is not given, client will stop on a first failed connection attempt.</p></dd>
 <dt><samp>-r</samp></dt>
 <dd><b>RTP mode</b><br />
 In order to facilitate tunneling both RTP and RTCP traffic for a
