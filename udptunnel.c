@@ -61,10 +61,12 @@ static int debug = 0;
 static void usage(char *progname) {
   fprintf(stderr, "Usage: %s -s TCP-port [-r] [-v] UDP-addr/UDP-port[/ttl]\n",
           progname);
-  fprintf(stderr, "    or %s -c TCP-addr[/TCP-port] [-r] [-v] UDP-addr/UDP-port[/ttl]\n",
+  fprintf(stderr, "    or %s -c TCP-addr[/TCP-port] [-r] [-v] [-t 20] UDP-addr/UDP-port[/ttl]\n",
           progname);
   fprintf(stderr, "     -s: Server mode.  Wait for TCP connections on the port.\n");
   fprintf(stderr, "     -c: Client mode.  Connect to the given address.\n");
+  fprintf(stderr, "     -t: Client mode only. Number of attempts in trying to connect to server, 5 seconds gap.\n");
+  fprintf(stderr, "         Default is instant fail.\n");
   fprintf(stderr, "     -r: RTP mode.  Connect/listen on ports N and N+1 for both UDP and TCP.\n");
   fprintf(stderr, "         Port numbers must be even.\n");
   fprintf(stderr, "     -v: Verbose mode.  Specify -v multiple times for increased verbosity.\n");
@@ -78,7 +80,7 @@ static void usage(char *progname) {
  * *is_server.  On failure, exit.
  */
 static void parse_args(int argc, char *argv[], struct relay **relays,
-                       int *relay_count, int *is_server)
+                       int *relay_count, int *is_server, int* tries)
 {
   int c;
   char *tcphostname, *tcpportstr, *udphostname, *udpportstr, *udpttlstr;
@@ -88,13 +90,14 @@ static void parse_args(int argc, char *argv[], struct relay **relays,
 
   *is_server = -1;
   *relay_count = 1;
+  *tries = 0;
 
   debug = 0;
 
   tcphostname = NULL;
   tcpportstr = NULL;
 
-  while ((c = getopt(argc, argv, "s:c:rvh")) != EOF) {
+  while ((c = getopt(argc, argv, "s:c:rvht:")) != EOF) {
     switch (c) {
     case 's':
       if (*is_server != -1) {
@@ -113,6 +116,14 @@ static void parse_args(int argc, char *argv[], struct relay **relays,
       }
       *is_server = 0;
       tcphostname = optarg;
+      break;
+    case 't':
+      if (*is_server != 0) {
+        fprintf(stderr, "%s: -t is client mode option only.\n",
+                argv[0]);
+        exit(2);
+      }
+      *tries = atoi(optarg);
       break;
     case 'r':
       *relay_count = 2;
@@ -451,17 +462,27 @@ static void await_incoming_connections(struct relay *relays, int relay_count)
  * element of the relay structure.
  * Exit on failure.
  */
-static void setup_tcp_client(struct relay *relay)
+static void setup_tcp_client(struct relay *relay, int tries)
 {
   /* Create TCP socket. */
-  if ((relay->tcp_sock = socket(PF_INET, SOCK_STREAM, 0)) < 0) {
+  while ((relay->tcp_sock = socket(PF_INET, SOCK_STREAM, 0)) < 0) {
     perror("setup_tcp_client: socket");
+    if(tries-- > 0) {
+      sleep(5);
+      continue;
+    }
+
     exit(1);
   }
 
-  if (connect(relay->tcp_sock, (struct sockaddr *) &(relay->tcpaddr),
+  while (connect(relay->tcp_sock, (struct sockaddr *) &(relay->tcpaddr),
               sizeof(relay->tcpaddr)) < 0) {
     perror("setup_tcp_client: connect");
+    if(tries-- > 0) {
+      sleep(5);
+      continue;
+    }
+
     exit(1);
   }
 
@@ -586,18 +607,19 @@ int main(int argc, char *argv[])
   struct relay *relays;
   int relay_count, is_server;
   int i;
+  int tries;
   fd_set readfds;
   int max = 0;
   int ok;
 
-  parse_args(argc, argv, &relays, &relay_count, &is_server);
+  parse_args(argc, argv, &relays, &relay_count, &is_server, &tries);
 
   for (i = 0; i < relay_count; i++) {
     if (is_server) {
       setup_server_listen(&relays[i]);
     }
     else {
-      setup_tcp_client(&relays[i]);
+      setup_tcp_client(&relays[i], tries);
     }
     setup_udp_recv(&relays[i]);
     setup_udp_send(&relays[i]);
