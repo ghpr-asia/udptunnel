@@ -1,3 +1,7 @@
+## Grasshopper README.md
+Code on `master` branch is open-sourced. However we are not open-sourcing `scripts/` directory since it's not related to `udptunnel` - thus keeping it in a dedicated directory.
+
+## Original README.md note
 UDPTunnel by Jonathan Lennox; copyright 1999,2001 by Columbia University.
 
 UDPTunnel is a small program which can tunnel UDP packets bi-directionally
