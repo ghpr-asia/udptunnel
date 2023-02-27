@@ -1,0 +1,38 @@
+image: asia-southeast1-docker.pkg.dev/ghpr-mgmt/dkr/ghp-ci-runner:0.0.18
+
+stages:
+  - build
+  - publish
+
+cpp_build:
+  stage: build
+  tags:
+    - centos
+  script:
+    - aclocal
+    - autoconf
+    - automake --add-missing
+    - ./configure
+    - make
+    - mkdir -p _out
+    - cp udptunnel _out/
+    - cp -r scripts _out/
+  artifacts:
+    expire_in: 24h
+    paths:
+      - _out/
+
+image_publish:
+  stage: publish
+  variables:
+    APP: udptunnel
+  tags:
+    - kaniko
+  image: asia-southeast1-docker.pkg.dev/ghpr-mgmt/dkr/kaniko:20220607
+  script:
+    - |
+        /kaniko/executor \
+        --context "${CI_PROJECT_DIR}/_out/" \
+        --dockerfile "${CI_PROJECT_DIR}/Dockerfile"  \
+        --destination "us-central1-docker.pkg.dev/ghpr-mgmt/dkr/${APP}:${CI_COMMIT_SHORT_SHA}" \
+        --destination "us-central1-docker.pkg.dev/ghpr-mgmt/dkr/${APP}:latest"

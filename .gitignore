@@ -1,0 +1,10 @@
+aclocal.m4
+autom4te.cache/
+.deps/
+Makefile.in
+*.o
+config.*
+Makefile
+configure
+udptunnel
+depcomp
